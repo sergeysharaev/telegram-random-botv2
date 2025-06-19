@@ -1,5 +1,11 @@
 {
-  "ideas": [],
-  "history": {},
-  "place_history": {}
+  "current_list": "default",
+  "lists": {
+    "default": {
+      "name": "🌞 Идеи для досуга 2025 🔥",
+      "ideas": [],
+      "history": {},
+      "place_history": {}
+    }
+  }
 }

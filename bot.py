@@ -8,7 +8,6 @@ TOKEN = os.getenv("BOT_TOKEN") or "YOUR_TOKEN_HERE"
 DATA_FILE = "data.json"
 bot = telebot.TeleBot(TOKEN)
 
-
 def load_data():
     if not os.path.exists(DATA_FILE):
         with open(DATA_FILE, "w", encoding="utf-8") as f:
@@ -16,40 +15,50 @@ def load_data():
     with open(DATA_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
-
 def save_data(data):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
+data = load_data()
 
 def main_menu():
-    markup = types.InlineKeyboardMarkup()
-    markup.row(types.InlineKeyboardButton("🎲 Получить идею", callback_data="get_idea"))
-    markup.row(types.InlineKeyboardButton("💡 Добавить идею", callback_data="addidea_hint"),
-               types.InlineKeyboardButton("📍 Добавить место", callback_data="addplace_hint"))
-    markup.row(types.InlineKeyboardButton("🗑 Удалить идею", callback_data="deleteidea_hint"),
-               types.InlineKeyboardButton("🗑 Удалить место", callback_data="deleteplace_hint"))
-    markup.row(types.InlineKeyboardButton("🗒 Все идеи", callback_data="list_ideas"))
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("🎲 Получить идею", callback_data="get_idea")
+    )
+    markup.add(
+        types.InlineKeyboardButton("💡 Добавить идею", callback_data="addidea"),
+        types.InlineKeyboardButton("📍 Добавить место", callback_data="addplace")
+    )
+    markup.add(
+        types.InlineKeyboardButton("🗑 Удалить идею", callback_data="deleteidea"),
+        types.InlineKeyboardButton("🗑 Удалить место", callback_data="deleteplace")
+    )
+    markup.add(
+        types.InlineKeyboardButton("🗒 Все идеи", callback_data="list_ideas"),
+        types.InlineKeyboardButton("◀️ Сменить список", callback_data="switchlist")
+    )
+    markup.add(
+        types.InlineKeyboardButton("📋 Создать список", callback_data="new_list"),
+        types.InlineKeyboardButton("❌ Удалить список", callback_data="delete_list")
+    )
     return markup
-
 
 @bot.message_handler(commands=["start", "help"])
 def handle_help(message):
     bot.send_message(message.chat.id,
-        ("👋 Я бот для идей досуга!\n\n"
-         "📌 /idea — получить случайную идею\n"
-         "📌 /addidea текст — добавить идею\n"
-         "📌 /addplace ID Место — добавить место к идее\n"
-         "📌 /deleteidea ID — удалить идею\n"
-         "📌 /deleteplace ID НомерМеста — удалить место\n"
-         "📌 /listideas — показать все идеи"),
+        "👋 Я бот для идей досуга!\n\n"
+        "📌 /idea — получить случайную идею\n"
+        "/addidea текст — добавить идею\n"
+        "/addplace ID Место — добавить место к идее\n"
+        "/deleteidea ID — удалить идею\n"
+        "/deleteplace ID НомерМеста — удалить место\n"
+        "/listideas — показать все идеи",
         reply_markup=main_menu()
     )
 
-
 @bot.message_handler(commands=["addidea"])
 def add_idea(message):
-    data = load_data()
     text = message.text[9:].strip()
     if not text:
         bot.send_message(message.chat.id, "⚠️ Напиши текст идеи после /addidea")
@@ -58,29 +67,24 @@ def add_idea(message):
     save_data(data)
     bot.send_message(message.chat.id, f"✅ Идея добавлена под номером {len(data['ideas'])}")
 
-
 @bot.message_handler(commands=["addplace"])
 def add_place(message):
     try:
-        data = load_data()
         parts = message.text.split(maxsplit=2)
         idea_id = int(parts[1]) - 1
         place = parts[2]
-        if idea_id < 0 or idea_id >= len(data["ideas"]):
-            bot.send_message(message.chat.id, "❌ Идея не найдена.")
-            return
-        data["ideas"][idea_id]["places"].append({"name": place})
-        save_data(data)
-        bot.send_message(message.chat.id, f"📍 Место добавлено к идее {idea_id+1}")
-    except Exception as e:
-        print(f"Ошибка при добавлении места: {e}")
+        if 0 <= idea_id < len(data["ideas"]):
+            data["ideas"][idea_id]["places"].append({"name": place})
+            save_data(data)
+            bot.send_message(message.chat.id, f"📍 Место добавлено к идее {idea_id + 1}")
+        else:
+            bot.send_message(message.chat.id, "❌ Идея с таким ID не найдена.")
+    except:
         bot.send_message(message.chat.id, "⚠️ Формат: /addplace ID Место")
-
 
 @bot.message_handler(commands=["deleteidea"])
 def delete_idea(message):
     try:
-        data = load_data()
         idea_id = int(message.text.split()[1])
         if 1 <= idea_id <= len(data["ideas"]):
             del data["ideas"][idea_id - 1]
@@ -92,52 +96,40 @@ def delete_idea(message):
             bot.send_message(message.chat.id, f"🗑 Идея {idea_id} удалена и порядок обновлён.")
         else:
             bot.send_message(message.chat.id, f"❌ Идея {idea_id} не найдена.")
-    except Exception as e:
-        print(f"Ошибка при удалении идеи: {e}")
+    except:
         bot.send_message(message.chat.id, "⚠️ Формат: /deleteidea ID")
-
 
 @bot.message_handler(commands=["deleteplace"])
 def delete_place(message):
     try:
-        data = load_data()
         parts = message.text.split(maxsplit=2)
         idea_id = int(parts[1]) - 1
         place_idx = int(parts[2]) - 1
-        if idea_id < 0 or idea_id >= len(data["ideas"]):
-            bot.send_message(message.chat.id, "❌ Идея не найдена.")
-            return
-        if place_idx < 0 or place_idx >= len(data["ideas"][idea_id]["places"]):
-            bot.send_message(message.chat.id, "❌ Место не найдено.")
-            return
-        removed = data["ideas"][idea_id]["places"].pop(place_idx)
-        save_data(data)
-        bot.send_message(message.chat.id, f"🗑 Место удалено: {removed['name']}")
-    except Exception as e:
-        print(f"Ошибка при удалении места: {e}")
+        if 0 <= idea_id < len(data["ideas"]) and 0 <= place_idx < len(data["ideas"][idea_id]["places"]):
+            removed = data["ideas"][idea_id]["places"].pop(place_idx)
+            save_data(data)
+            bot.send_message(message.chat.id, f"🗑 Место удалено: {removed['name']}")
+        else:
+            bot.send_message(message.chat.id, "❌ Неверный ID идеи или номер места.")
+    except:
         bot.send_message(message.chat.id, "⚠️ Формат: /deleteplace ID НомерМеста")
-
 
 @bot.message_handler(commands=["listideas"])
 def list_ideas(message):
-    data = load_data()
     if not data["ideas"]:
         bot.send_message(message.chat.id, "📭 Идей пока нет.")
         return
     lines = []
     for idea in data["ideas"]:
-        lines.append(f"**{idea['id']}. {idea['text']}**\n")
-        for place in idea["places"]:
-            lines.append(f"📍 {place['name']}")
-        lines.append("")  # пустая строка между идеями
+        lines.append(f"{idea['id']}. {idea['text']}")
+        for idx, place in enumerate(idea["places"], 1):
+            lines.append(f"   📍 {idx}) {place['name']}")
     full = "\n".join(lines)
-    chunks = [full[i:i + 4000] for i in range(0, len(full), 4000)]
+    chunks = [full[i:i+4000] for i in range(0, len(full), 4000)]
     for part in chunks:
-        bot.send_message(message.chat.id, part, parse_mode="Markdown")
-
+        bot.send_message(message.chat.id, part)
 
 def send_random_idea(chat_id):
-    data = load_data()
     chat_id_str = str(chat_id)
     history = data["history"].get(chat_id_str, [])
     available = [i for i in data["ideas"] if i["id"] not in history]
@@ -151,7 +143,7 @@ def send_random_idea(chat_id):
 
     idea = random.choice(available)
     data["history"].setdefault(chat_id_str, []).append(idea["id"])
-    response = f"**{idea['id']}. {idea['text']}**\n"
+    response = f"📍 *{idea['text']}*"
 
     if idea["places"]:
         used_places = data["place_history"].setdefault(chat_id_str, {}).setdefault(str(idea["id"]), [])
@@ -167,11 +159,9 @@ def send_random_idea(chat_id):
     save_data(data)
     bot.send_message(chat_id, response, parse_mode="Markdown", reply_markup=main_menu())
 
-
 @bot.message_handler(commands=["idea"])
 def handle_idea(message):
     send_random_idea(message.chat.id)
-
 
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callbacks(call):
@@ -187,6 +177,5 @@ def handle_callbacks(call):
         bot.send_message(call.message.chat.id, "✏️ Введите:\n`/deleteidea ID`", parse_mode="Markdown")
     elif call.data == "deleteplace_hint":
         bot.send_message(call.message.chat.id, "✏️ Введите:\n`/deleteplace ID НомерМеста`", parse_mode="Markdown")
-
 
 bot.polling()

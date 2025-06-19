@@ -140,8 +140,7 @@ def send_idea_list(message):
         bot.send_message(message.chat.id, "❌ Нет активного списка. Создайте новый.")
         return
     idea_list = chat["lists"][current_key]
-    lines = [f"{idea_list['name']}
-"]
+   lines = [f"{idea_list['name']}"]
     for idea in idea_list["ideas"]:
         lines.append(f"*{idea['id']}. {idea['text']}*
 ")

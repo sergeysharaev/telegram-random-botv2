@@ -1,10 +1,10 @@
 services:
-  - type: worker
-    name: idea-bot
+  - type: web
+    name: leisure-idea-bot
     env: python
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: python bot.py
+    buildCommand: ""
+    startCommand: "python bot.py"
     envVars:
       - key: BOT_TOKEN
         sync: false

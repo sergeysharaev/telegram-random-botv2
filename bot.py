@@ -1,194 +1,234 @@
+# -*- coding: utf-8 -*-
+import telebot
 import os
 import json
 import random
-import telebot
 from telebot import types
 
 TOKEN = os.getenv("BOT_TOKEN") or "YOUR_TOKEN_HERE"
 DATA_FILE = "data.json"
-bot = telebot.TeleBot(TOKEN, parse_mode='Markdown')
+bot = telebot.TeleBot(TOKEN, parse_mode="Markdown")
+
+# Загружаем и сохраняем JSON
 
 def load_data():
     if not os.path.exists(DATA_FILE):
         with open(DATA_FILE, "w", encoding="utf-8") as f:
-            json.dump({"current_list": "default", "lists": {"default": {
-                "name": "🌞 Идеи для досуга 2025 🔥",
-                "ideas": [], "history": {}, "place_history": {}
-            }}}, f, ensure_ascii=False, indent=2)
+            json.dump({"chats": {}}, f, ensure_ascii=False, indent=2)
     with open(DATA_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
-def save_data(data):
+def save_data():
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 data = load_data()
 
-def get_current_list():
-    return data["lists"][data["current_list"]]
+# Инициализация чата
+
+def init_chat(chat_id):
+    str_id = str(chat_id)
+    if str_id not in data["chats"]:
+        data["chats"][str_id] = {
+            "lists": {},
+            "current_list": None,
+            "state": {}
+        }
+
+# Меню
 
 def main_menu():
-    markup = types.InlineKeyboardMarkup()
-    markup.row(types.InlineKeyboardButton("🎲 Получить идею", callback_data="get_idea"))
-    markup.row(types.InlineKeyboardButton("💡 Добавить идею", callback_data="addidea_hint"))
-    markup.row(types.InlineKeyboardButton("📍 Добавить место", callback_data="addplace_hint"))
-    markup.row(types.InlineKeyboardButton("🗑 Удалить идею", callback_data="deleteidea_hint"))
-    markup.row(types.InlineKeyboardButton("🗑 Удалить место", callback_data="deleteplace_hint"))
-    markup.row(types.InlineKeyboardButton("📋 Сменить список", callback_data="switch_list"))
-    markup.row(types.InlineKeyboardButton("🗒 Все идеи", callback_data="list_ideas"))
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("🎲 Получить идею", callback_data="get_idea")
+    )
+    markup.add(
+        types.InlineKeyboardButton("💡 Добавить идею", callback_data="addidea"),
+        types.InlineKeyboardButton("📍 Добавить место", callback_data="addplace")
+    )
+    markup.add(
+        types.InlineKeyboardButton("🗑 Удалить идею", callback_data="deleteidea"),
+        types.InlineKeyboardButton("🗑 Удалить место", callback_data="deleteplace")
+    )
+    markup.add(
+        types.InlineKeyboardButton("🗒 Все идеи", callback_data="listideas"),
+        types.InlineKeyboardButton("◀️ Сменить список", callback_data="switchlist")
+    )
     return markup
 
-@bot.message_handler(commands=["start", "help"])
-def handle_start(message):
+# Команды
+@bot.message_handler(commands=["start"])
+def start(message):
+    chat_id = str(message.chat.id)
+    init_chat(chat_id)
     bot.send_message(message.chat.id, "👋 Я бот для идей досуга!", reply_markup=main_menu())
 
-@bot.message_handler(commands=["addidea"])
-def add_idea(message):
-    text = message.text[9:].strip()
-    if not text:
-        bot.reply_to(message, "⚠️ Напиши идею после /addidea")
+# Кнопки
+@bot.callback_query_handler(func=lambda call: True)
+def handle_buttons(call):
+    chat_id = str(call.message.chat.id)
+    user_id = str(call.from_user.id)
+    init_chat(chat_id)
+    chat = data["chats"][chat_id]
+    state = chat["state"]
+
+    if call.data == "get_idea":
+        show_random_idea(call.message)
         return
-    clist = get_current_list()
-    if any(i["text"].strip().lower() == text.lower() for i in clist["ideas"]):
-        bot.reply_to(message, "⚠️ Такая идея уже существует.")
+
+    if call.data == "listideas":
+        send_idea_list(call.message)
         return
-    clist["ideas"].append({"id": len(clist["ideas"]) + 1, "text": text, "places": []})
-    save_data(data)
-    bot.reply_to(message, f"✅ Идея добавлена под номером {len(clist['ideas'])}")
 
-@bot.message_handler(commands=["addplace"])
-def add_place(message):
-    try:
-        _, idea_id, place = message.text.split(maxsplit=2)
-        idea = get_current_list()["ideas"][int(idea_id) - 1]
-        if any(p["name"].strip().lower() == place.lower() for p in idea["places"]):
-            bot.reply_to(message, "⚠️ Это место уже добавлено к идее.")
-            return
-        idea["places"].append({"name": place})
-        save_data(data)
-        bot.reply_to(message, f"📍 Место добавлено к идее {idea_id}")
-    except:
-        bot.reply_to(message, "⚠️ Формат: /addplace ID Место")
-
-@bot.message_handler(commands=["deleteidea"])
-def delete_idea(message):
-    try:
-        idea_id = int(message.text.split()[1])
-        clist = get_current_list()
-        del clist["ideas"][idea_id - 1]
-        for i, idea in enumerate(clist["ideas"], 1):
-            idea["id"] = i
-        clist["history"] = {}
-        clist["place_history"] = {}
-        save_data(data)
-        bot.reply_to(message, f"🗑 Идея {idea_id} удалена и порядок обновлён.")
-    except:
-        bot.reply_to(message, "⚠️ Формат: /deleteidea ID")
-
-@bot.message_handler(commands=["deleteplace"])
-def delete_place(message):
-    try:
-        _, idea_id, place_idx = message.text.split()
-        idea = get_current_list()["ideas"][int(idea_id) - 1]
-        removed = idea["places"].pop(int(place_idx) - 1)
-        save_data(data)
-        bot.reply_to(message, f"🗑 Удалено место: {removed['name']}")
-    except:
-        bot.reply_to(message, "⚠️ Формат: /deleteplace ID НомерМеста")
-
-@bot.message_handler(commands=["listideas"])
-def list_ideas(message):
-    clist = get_current_list()
-    if not clist["ideas"]:
-        bot.send_message(message.chat.id, "📭 Идей пока нет.")
+    if call.data == "addidea":
+        state[user_id] = {"mode": "addidea"}
+        bot.edit_message_text("✏️ Введите идею или нажмите ❌ Отмена.",
+                              chat_id=call.message.chat.id,
+                              message_id=call.message.message_id,
+                              reply_markup=cancel_markup())
         return
-    text = f"*{data['lists'][data['current_list']]['name']}*\n\n"
-    for idea in clist["ideas"]:
-        text += f"{idea['id']}. {idea['text']}\n"
-        for idx, place in enumerate(idea["places"], 1):
-            text += f"   📍 {idx}) {place['name']}\n"
+
+    if call.data == "addplace":
+        state[user_id] = {"mode": "addplace"}
+        bot.edit_message_text("✏️ Введите ID и место (например: `3 Парк Сказка`) или нажмите ❌ Отмена.",
+                              chat_id=call.message.chat.id,
+                              message_id=call.message.message_id,
+                              reply_markup=cancel_markup())
+        return
+
+    if call.data == "deleteidea":
+        state[user_id] = {"mode": "deleteidea"}
+        bot.edit_message_text("✏️ Введите номер идеи для удаления или нажмите ❌ Отмена.",
+                              chat_id=call.message.chat.id,
+                              message_id=call.message.message_id,
+                              reply_markup=cancel_markup())
+        return
+
+    if call.data == "deleteplace":
+        state[user_id] = {"mode": "deleteplace"}
+        bot.edit_message_text("✏️ Введите ID идеи и номер места (например: `2 1`) или нажмите ❌ Отмена.",
+                              chat_id=call.message.chat.id,
+                              message_id=call.message.message_id,
+                              reply_markup=cancel_markup())
+        return
+
+    if call.data == "switchlist":
+        bot.send_message(call.message.chat.id, "📋 Списоков пока нет (эта часть пока заглушка).", reply_markup=main_menu())
+
+    if call.data == "cancel":
+        state.pop(user_id, None)
+        bot.edit_message_text("❌ Действие отменено.", chat_id=call.message.chat.id,
+                              message_id=call.message.message_id,
+                              reply_markup=main_menu())
+        save_data()
+        return
+
+# Отмена
+
+def cancel_markup():
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("❌ Отмена", callback_data="cancel"))
+    return markup
+
+# Список идей
+
+def send_idea_list(message):
+    chat_id = str(message.chat.id)
+    chat = data["chats"][chat_id]
+    current_key = chat["current_list"]
+    if not current_key or current_key not in chat["lists"]:
+        bot.send_message(message.chat.id, "❌ Нет активного списка. Создайте новый.")
+        return
+    idea_list = chat["lists"][current_key]
+    lines = [f"{idea_list['name']}
+"]
+    for idea in idea_list["ideas"]:
+        lines.append(f"*{idea['id']}. {idea['text']}*
+")
+        for place in idea["places"]:
+            lines.append(f"📍{place['name']}")
+        lines.append("")
+    text = "
+".join(lines).strip()
     for chunk in [text[i:i+4000] for i in range(0, len(text), 4000)]:
         bot.send_message(message.chat.id, chunk)
 
-@bot.message_handler(commands=["idea"])
-def send_random(message):
-    send_random_idea(message.chat.id)
+# Идея случайная
 
-def send_random_idea(chat_id):
-    cid = str(chat_id)
-    clist = get_current_list()
-    history = clist["history"].get(cid, [])
-    available = [i for i in clist["ideas"] if i["id"] not in history]
-
-    if not available:
-        clist["history"][cid] = []
-        clist["place_history"][cid] = {}
-        save_data(data)
-        bot.send_message(chat_id, "✅ Все идеи показаны. Начинаю заново.")
+def show_random_idea(message):
+    chat_id = str(message.chat.id)
+    chat = data["chats"][chat_id]
+    current_key = chat["current_list"]
+    if not current_key or current_key not in chat["lists"]:
+        bot.send_message(message.chat.id, "❌ Нет активного списка. Создайте новый.")
         return
-
-    idea = random.choice(available)
-    clist["history"].setdefault(cid, []).append(idea["id"])
-    result = f"💡 *{idea['text']}*"
-
+    idea_list = chat["lists"][current_key]
+    if not idea_list["ideas"]:
+        bot.send_message(message.chat.id, "📭 Идей пока нет.")
+        return
+    idea = random.choice(idea_list["ideas"])
+    response = f"💡 *{idea['text']}*"
     if idea["places"]:
-        p_hist = clist["place_history"].setdefault(cid, {}).setdefault(str(idea["id"]), [])
-        options = [p for i, p in enumerate(idea["places"]) if i not in p_hist]
-        if not options:
-            p_hist.clear()
-            options = idea["places"]
-        place = random.choice(options)
-        p_hist.append(idea["places"].index(place))
-        result += f"\n📍 {place['name']}"
+        response += f"
+📍 {random.choice(idea['places'])['name']}"
+    bot.send_message(message.chat.id, response)
 
-    save_data(data)
-    bot.send_message(chat_id, result, reply_markup=main_menu())
+# Обработка текста
+@bot.message_handler(func=lambda msg: True)
+def handle_text(message):
+    chat_id = str(message.chat.id)
+    user_id = str(message.from_user.id)
+    init_chat(chat_id)
+    chat = data["chats"][chat_id]
+    state = chat["state"].get(user_id)
+    if not state:
+        return
+    mode = state.get("mode")
+    current_key = chat["current_list"]
+    if not current_key or current_key not in chat["lists"]:
+        bot.send_message(message.chat.id, "❌ Нет активного списка. Создайте новый.")
+        chat["state"].pop(user_id, None)
+        save_data()
+        return
+    lst = chat["lists"][current_key]
 
-def list_selector():
-    markup = types.InlineKeyboardMarkup()
-    for key, val in data["lists"].items():
-        text = f"✅ {val['name']}" if key == data["current_list"] else val["name"]
-        markup.row(types.InlineKeyboardButton(text, callback_data=f"setlist_{key}"))
-    markup.row(types.InlineKeyboardButton("➕ Новый список", callback_data="new_list"))
-    markup.row(types.InlineKeyboardButton("❌ Удалить список", callback_data="delete_list"))
-    return markup
+    if mode == "addidea":
+        new_id = len(lst["ideas"]) + 1
+        lst["ideas"].append({"id": new_id, "text": message.text.strip(), "places": []})
+        bot.send_message(message.chat.id, f"✅ Идея добавлена под номером {new_id}.", reply_markup=main_menu())
 
-@bot.callback_query_handler(func=lambda c: True)
-def handle_callback(call):
-    if call.data == "get_idea": send_random_idea(call.message.chat.id)
-    elif call.data == "list_ideas": list_ideas(call.message)
-    elif call.data == "addidea_hint": bot.send_message(call.message.chat.id, "/addidea Ваша идея")
-    elif call.data == "addplace_hint": bot.send_message(call.message.chat.id, "/addplace ID Место")
-    elif call.data == "deleteidea_hint": bot.send_message(call.message.chat.id, "/deleteidea ID")
-    elif call.data == "deleteplace_hint": bot.send_message(call.message.chat.id, "/deleteplace ID Номер")
-    elif call.data == "switch_list": bot.send_message(call.message.chat.id, "📋 Выбери список:", reply_markup=list_selector())
-    elif call.data.startswith("setlist_"):
-        data["current_list"] = call.data.split("_", 1)[1]
-        save_data(data)
-        bot.send_message(call.message.chat.id, "✅ Список активирован.", reply_markup=main_menu())
-    elif call.data == "new_list":
-        msg = bot.send_message(call.message.chat.id, "✏️ Введите название нового списка:")
-        bot.register_next_step_handler(msg, create_new_list)
-    elif call.data == "delete_list":
-        if data["current_list"] == "default":
-            bot.send_message(call.message.chat.id, "❌ Нельзя удалить список по умолчанию.")
-        else:
-            del data["lists"][data["current_list"]]
-            data["current_list"] = "default"
-            save_data(data)
-            bot.send_message(call.message.chat.id, "🗑 Список удалён. Возврат к 'default'.", reply_markup=main_menu())
+    elif mode == "addplace":
+        try:
+            parts = message.text.strip().split(maxsplit=1)
+            idea_id = int(parts[0]) - 1
+            place = parts[1]
+            lst["ideas"][idea_id]["places"].append({"name": place})
+            bot.send_message(message.chat.id, f"📍 Место добавлено к идее {idea_id+1}.", reply_markup=main_menu())
+        except:
+            bot.send_message(message.chat.id, "⚠️ Формат: ID Место", reply_markup=main_menu())
 
-def create_new_list(message):
-    name = message.text.strip()
-    key = name.lower().replace(" ", "_")[:32]
-    n = 1
-    base = key
-    while key in data["lists"]:
-        key = f"{base}_{n}"
-        n += 1
-    data["lists"][key] = {"name": name, "ideas": [], "history": {}, "place_history": {}}
-    data["current_list"] = key
-    save_data(data)
-    bot.send_message(message.chat.id, f"✅ Новый список создан и активирован: *{name}*", reply_markup=main_menu())
+    elif mode == "deleteidea":
+        try:
+            idx = int(message.text.strip()) - 1
+            lst["ideas"].pop(idx)
+            for i, idea in enumerate(lst["ideas"], 1):
+                idea["id"] = i
+            bot.send_message(message.chat.id, f"🗑 Идея удалена.", reply_markup=main_menu())
+        except:
+            bot.send_message(message.chat.id, "⚠️ Неверный номер идеи.", reply_markup=main_menu())
 
+    elif mode == "deleteplace":
+        try:
+            parts = message.text.strip().split()
+            idx = int(parts[0]) - 1
+            place_idx = int(parts[1]) - 1
+            removed = lst["ideas"][idx]["places"].pop(place_idx)
+            bot.send_message(message.chat.id, f"🗑 Удалено место: {removed['name']}", reply_markup=main_menu())
+        except:
+            bot.send_message(message.chat.id, "⚠️ Ошибка удаления места.", reply_markup=main_menu())
+
+    chat["state"].pop(user_id, None)
+    save_data()
+
+# Запуск
 bot.infinity_polling()

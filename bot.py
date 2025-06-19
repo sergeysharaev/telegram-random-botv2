@@ -33,7 +33,7 @@ def main_menu():
     return markup
 
 @bot.message_handler(commands=["start", "help"])
-def handle_help(message):⚡
+def handle_help(message):
     bot.send_message(message.chat.id,
         "👋 Я бот для идей досуга!
 

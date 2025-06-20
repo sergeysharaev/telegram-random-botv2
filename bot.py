@@ -4,12 +4,13 @@ import random
 import telebot
 from telebot import types
 
+# 1) поставьте BOT_TOKEN в переменных окружения
 TOKEN = os.getenv("BOT_TOKEN") or "YOUR_TOKEN_HERE"
 DATA_FILE = "data.json"
 
 bot = telebot.TeleBot(TOKEN, parse_mode="Markdown")
 
-# ────────────────────────────── storage ────────────────────────────── #
+# ──────── storage ────────
 def _load_data():
     if not os.path.exists(DATA_FILE):
         with open(DATA_FILE, "w", encoding="utf-8") as f:
@@ -31,87 +32,71 @@ def _init_chat(chat_id: int):
             "lists": {
                 "default": {
                     "name": "🌞 Идеи для досуга 2025 🔥",
-                    "ideas": []          # [{"id": 1, "text": "...", "places": [] }, ...]
+                    "ideas": []          # [{"id": 1, "text": "...", "places": []}, ...]
                 }
             }
         }
 
-def _chat(chat_id: int):
+def _chat(chat_id):
     _init_chat(chat_id)
     return DATA["chats"][str(chat_id)]
 
-def _current(chat_id: int):
+def _current(chat_id):
     ch = _chat(chat_id)
     return ch["lists"][ch["current_list"]]
 
-# ────────────────────────────── keyboards ────────────────────────────── #
+# ──────── keyboards ────────
 def main_menu():
     kb = types.InlineKeyboardMarkup(row_width=2)
 
-    # 1-я строка
     kb.add(types.InlineKeyboardButton("🎲 Получить идею", callback_data="get_idea"))
 
-    # 2-я строка
     kb.add(
         types.InlineKeyboardButton("💡 Добавить идею", callback_data="add_idea"),
-        types.InlineKeyboardButton("📍 Добавить место", callback_data="add_place")
+        types.InlineKeyboardButton("📍 Добавить место", callback_data="add_place"),
     )
 
-    # 3-я строка
     kb.add(
         types.InlineKeyboardButton("🗑 Удалить идею", callback_data="del_idea"),
-        types.InlineKeyboardButton("🗑 Удалить место", callback_data="del_place")
+        types.InlineKeyboardButton("🗑 Удалить место", callback_data="del_place"),
     )
 
-    # 4-я строка
     kb.add(
         types.InlineKeyboardButton("🗒 Все идеи", callback_data="list_ideas"),
-        types.InlineKeyboardButton("◀️ Сменить список", callback_data="switch_list")
-    )
-
-    # дополнительная строка для управления списками
-    kb.add(
-        types.InlineKeyboardButton("📋 Создать список", callback_data="new_list"),
-        types.InlineKeyboardButton("❌ Удалить список", callback_data="delete_list")
+        types.InlineKeyboardButton("◀️ Сменить список", callback_data="switch_list"),
     )
     return kb
 
-# ────────────────────────────── utils ────────────────────────────── #
+# ──────── helpers ────────
 def _format_ideas(ideas):
-    """Возвращает красиво отформатированный текст всех идей."""
     out = []
     for idea in ideas:
         out.append(f"*{idea['id']}. {idea['text']}*")
         for place in idea["places"]:
             out.append(f"📍 {place['name']}")
-        out.append("")          # пустая строка между идеями
+        out.append("")  # пустая строка
     return "\n".join(out).strip()
 
 def _renumber(ideas):
-    """Поддерживает сквозную нумерацию после удалений."""
-    for i, idea in enumerate(ideas, start=1):
+    for i, idea in enumerate(ideas, 1):
         idea["id"] = i
 
-# ────────────────────────────── commands ────────────────────────────── #
+# ──────── commands ────────
 @bot.message_handler(commands=["start", "help"])
 def handle_start(message):
-    ch = _chat(message.chat.id)
     bot.send_message(
         message.chat.id,
-        f"👋 Я бот идей для досуга!\n\n"
-        f"📌 Активный список: *{ch['lists'][ch['current_list']]['name']}*\n\n"
-        "Действуй с помощью кнопок ниже или командами:\n"
+        "👋 Я бот идей для досуга!\n\n"
+        "Пользуйся кнопками или командами:\n"
         "`/idea`, `/addidea текст`, `/addplace ID место`,\n"
         "`/deleteidea ID`, `/deleteplace ID номер`, `/listideas`",
-        reply_markup=main_menu()
+        reply_markup=main_menu(),
     )
 
-# ——— текстовая команда /idea ——— #
 @bot.message_handler(commands=["idea"])
 def cmd_idea(message):
     _send_random_idea(message.chat.id)
 
-# ——— /addidea текст ——— #
 @bot.message_handler(commands=["addidea"])
 def cmd_addidea(message):
     text = message.text.partition(" ")[2].strip()
@@ -120,7 +105,6 @@ def cmd_addidea(message):
         return
     _add_idea(message.chat.id, text)
 
-# ——— /addplace ID место ——— #
 @bot.message_handler(commands=["addplace"])
 def cmd_addplace(message):
     parts = message.text.split(maxsplit=2)
@@ -129,7 +113,6 @@ def cmd_addplace(message):
         return
     _add_place(message.chat.id, int(parts[1]), parts[2])
 
-# ——— /deleteidea ID ——— #
 @bot.message_handler(commands=["deleteidea"])
 def cmd_delidea(message):
     parts = message.text.split()
@@ -138,7 +121,6 @@ def cmd_delidea(message):
         return
     _delete_idea(message.chat.id, int(parts[1]))
 
-# ——— /deleteplace ID номер ——— #
 @bot.message_handler(commands=["deleteplace"])
 def cmd_delplace(message):
     parts = message.text.split(maxsplit=2)
@@ -147,12 +129,11 @@ def cmd_delplace(message):
         return
     _delete_place(message.chat.id, int(parts[1]), int(parts[2]))
 
-# ——— /listideas ——— #
 @bot.message_handler(commands=["listideas"])
 def cmd_listideas(message):
     _list_ideas(message.chat.id)
 
-# ────────────────────────────── callbacks (кнопки) ────────────────────────────── #
+# ──────── callbacks ────────
 @bot.callback_query_handler(func=lambda c: True)
 def callbacks(call):
     data = call.data
@@ -168,7 +149,7 @@ def callbacks(call):
     elif data == "add_place":
         msg = bot.send_message(
             cid,
-            "✏️ Введите через пробел: номер_идеи место\nНапр.: `3 Парк «Сказка»`"
+            "✏️ Введите через пробел: `номер_идеи место`\nНапр.: `3 Парк «Сказка»`",
         )
         bot.register_next_step_handler(msg, lambda m: _handle_add_place(cid, m.text))
 
@@ -195,7 +176,9 @@ def callbacks(call):
             ch["current_list"] = key
             _save()
             bot.answer_callback_query(call.id, "✅ Список выбран")
-            bot.edit_message_reply_markup(cid, call.message.message_id, reply_markup=main_menu())
+            bot.edit_message_reply_markup(
+                cid, call.message.message_id, reply_markup=main_menu()
+            )
 
     elif data == "new_list":
         msg = bot.send_message(cid, "📋 Введите название нового списка:")
@@ -204,19 +187,17 @@ def callbacks(call):
     elif data == "delete_list":
         _delete_list(cid)
 
-# ───────────────────────── core ───────── #
+# ──────── core ────────
 def _send_random_idea(chat_id):
     cur = _current(chat_id)
     if not cur["ideas"]:
         bot.send_message(chat_id, "📭 В этом списке пока нет идей.")
         return
-
     idea = random.choice(cur["ideas"])
     answer = f"*{idea['text']}*"
     if idea["places"]:
         answer += f"\n📍 {random.choice(idea['places'])['name']}"
-
-    bot.send_message(chat_id, answer)              # без клавиатуры
+    bot.send_message(chat_id, answer)
 
 def _add_idea(chat_id, text):
     cur = _current(chat_id)
@@ -276,20 +257,26 @@ def _handle_del_place(chat_id, text):
         bot.send_message(chat_id, "⚠️ Формат: `номер_идеи номер_места`")
 
 def _list_ideas(chat_id):
-    ideas = _current(chat_id)["ideas"]
-    if not ideas:
+    ch = _chat(chat_id)
+    cur = _current(chat_id)
+    if not cur["ideas"]:
         bot.send_message(chat_id, "📭 В этом списке пока нет идей.")
         return
-    txt = _format_ideas(ideas)
-    for chunk in (txt[i:i+4000] for i in range(0, len(txt), 4000)):
+    header = f"*{cur['name']}*\n\n"
+    txt = header + _format_ideas(cur["ideas"])
+    for chunk in (txt[i : i + 4000] for i in range(0, len(txt), 4000)):
         bot.send_message(chat_id, chunk)
 
 def _show_lists(chat_id):
     ch = _chat(chat_id)
     kb = types.InlineKeyboardMarkup()
     for key, lst in ch["lists"].items():
-        title = "✅ " + lst["name"] if key == ch["current_list"] else lst["name"]
+        title = ("✅ " if key == ch["current_list"] else "") + lst["name"]
         kb.add(types.InlineKeyboardButton(title, callback_data=f"use_list:{key}"))
+    kb.add(  # подменю
+        types.InlineKeyboardButton("📋 Создать список", callback_data="new_list"),
+        types.InlineKeyboardButton("❌ Удалить список", callback_data="delete_list"),
+    )
     bot.send_message(chat_id, "🔄 Выберите список:", reply_markup=kb)
 
 def _create_list(chat_id, name):
@@ -308,12 +295,12 @@ def _delete_list(chat_id):
     if len(ch["lists"]) == 1:
         bot.send_message(chat_id, "❌ Нельзя удалить последний список.")
         return
-    cur = ch["current_list"]
-    del ch["lists"][cur]
-    ch["current_list"] = next(iter(ch["lists"]))   # переключаемся на оставшийся
+    cur_key = ch["current_list"]
+    del ch["lists"][cur_key]
+    ch["current_list"] = next(iter(ch["lists"]))
     _save()
     bot.send_message(chat_id, "🗑 Текущий список удалён", reply_markup=main_menu())
 
-# ────────────────────────────── run ────────────────────────────── #
+# ──────── run ────────
 if __name__ == "__main__":
     bot.polling(skip_pending=True)

@@ -272,9 +272,28 @@ def _delete_list(cid: int):
     _save()
     bot.send_message(cid, "🗑 Список удалён", reply_markup=_menu())
 
+<<<<<<< HEAD
 
 # ───────────────────— MESSAGE HANDLERS ───────────────────—
 
+=======
+<<<<<<< HEAD
+# ─────────────────── LIST IDEAS ───────────────────
+def _list_ideas(cid: int):
+    cur = _cur(cid)
+    if not cur["ideas"]:
+        return bot.send_message(cid, "📭 В этом списке пока нет идей.")
+    used = set(cur["history"])
+    header = f"<b>{html.escape(cur['name'])}</b>\n\n"
+    body = _fmt_html(cur["ideas"], used)
+    for chunk in (body[i:i+4000] for i in range(0, len(body), 4000)):
+        bot.send_message(cid, header + chunk, parse_mode="HTML"); header=""
+=======
+>>>>>>> f0b9290 (✅ Финальная версия бота с поддержкой списков)
+
+# ───────────────────— MESSAGE HANDLERS ───────────────────—
+
+>>>>>>> aad8933
 @bot.message_handler(commands=["start", "help"])
 def _cmd_start(m):
     bot.send_message(

@@ -15,7 +15,7 @@ def load_data():
                 "current_list": "default",
                 "lists": {
                     "default": {
-                        "name": "\ud83c\udf1e Идеи для досуга",
+                        "name": "🌞 Идеи для досуга 2025 🔥",
                         "ideas": [],
                         "history": {},
                         "place_history": {}
@@ -36,31 +36,31 @@ def current():
 
 def main_menu():
     markup = types.InlineKeyboardMarkup(row_width=2)
-    markup.add(types.InlineKeyboardButton("\ud83c\udfb2 Получить идею", callback_data="get_idea"))
+    markup.add(types.InlineKeyboardButton("🎲 Получить идею", callback_data="get_idea"))
     markup.add(
-        types.InlineKeyboardButton("\ud83d\udca1 Добавить идею", callback_data="addidea"),
-        types.InlineKeyboardButton("\ud83d\udccd Добавить место", callback_data="addplace")
+        types.InlineKeyboardButton("💡 Добавить идею", callback_data="addidea"),
+        types.InlineKeyboardButton("📍 Добавить место", callback_data="addplace")
     )
     markup.add(
-        types.InlineKeyboardButton("\ud83d\udd91 Удалить идею", callback_data="deleteidea"),
-        types.InlineKeyboardButton("\ud83d\udd91 Удалить место", callback_data="deleteplace")
+        types.InlineKeyboardButton("🗑 Удалить идею", callback_data="deleteidea"),
+        types.InlineKeyboardButton("🗑 Удалить место", callback_data="deleteplace")
     )
     markup.add(
-        types.InlineKeyboardButton("\ud83d\udd12 Все идеи", callback_data="list_ideas"),
-        types.InlineKeyboardButton("\u25c0\ufe0f Сменить список", callback_data="switchlist")
+        types.InlineKeyboardButton("🗒 Все идеи", callback_data="list_ideas"),
+        types.InlineKeyboardButton("◀️ Сменить список", callback_data="switchlist")
     )
     markup.add(
-        types.InlineKeyboardButton("\ud83d\udccb Создать список", callback_data="new_list"),
-        types.InlineKeyboardButton("\u274c Удалить список", callback_data="delete_list")
+        types.InlineKeyboardButton("📋 Создать список", callback_data="new_list"),
+        types.InlineKeyboardButton("❌ Удалить список", callback_data="delete_list")
     )
     return markup
 
 @bot.message_handler(commands=["start", "help"])
 def handle_help(message):
     bot.send_message(message.chat.id,
-        f"\ud83d\udc4b Я бот для идей досуга!\n\n"
-        f"\ud83d\udccc Активный список: *{data['lists'][data['current_list']]['name']}*\n\n"
-        "\ud83d\udd39 /idea — получить случайную идею\n"
+        f"👋 Я бот для идей досуга!\n\n"
+        f"📌 Активный список: *{data['lists'][data['current_list']]['name']}*\n\n"
+        "🔹 /idea — получить случайную идею\n"
         "/addidea текст — добавить идею\n"
         "/addplace ID Место — добавить место к идее\n"
         "/deleteidea ID — удалить идею\n"
